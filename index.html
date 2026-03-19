@@ -3,106 +3,174 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Remote Control & File Manager</title>
+    <title>Remote Control Dashboard</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #eef2f5; margin: 0; padding: 20px; display: flex; gap: 20px; }
-        .panel { background: #fff; flex: 1; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); height: 90vh; overflow-y: auto; }
-        h3 { margin-top: 0; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #eef2f5; margin: 0; padding: 0; }
         
-        /* Screen Capture Styles */
-        .control-group { margin-bottom: 15px; }
-        button { padding: 8px 15px; cursor: pointer; background: #007bff; color: #fff; border: none; border-radius: 4px; font-weight: bold; }
-        button:hover { background: #0056b3; }
-        button.success { background: #28a745; } button.success:hover { background: #1e7e34; }
-        button.danger { background: #dc3545; } button.danger:hover { background: #c82333; }
-        input[type="number"], input[type="file"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
-        #imageGallery img { max-width: 100%; border-radius: 5px; margin-top: 10px; border: 2px solid #333; }
+        /* Navbar */
+        .navbar { background: #2C3E50; color: white; padding: 15px 20px; text-align: center; font-size: 24px; font-weight: bold; box-shadow: 0 2px 5px rgba(0,0,0,0.2); }
+        .back-btn { float: left; background: #34495E; border: none; color: white; padding: 8px 15px; border-radius: 5px; cursor: pointer; font-size: 14px; margin-top: 2px; }
+        .back-btn:hover { background: #1ABC9C; }
 
-        /* File Manager Styles */
-        .fm-header { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 15px; }
-        .fm-path { font-family: monospace; font-size: 14px; word-break: break-all; }
-        table { width: 100%; border-collapse: collapse; text-align: left; }
-        th, td { padding: 10px; border-bottom: 1px solid #eee; }
-        th { background: #f1f1f1; }
-        tr:hover { background: #f9f9f9; }
-        .icon { font-size: 20px; margin-right: 10px; cursor: pointer; }
-        .file-name { cursor: pointer; user-select: none; }
-        .file-name:hover { color: #007bff; text-decoration: underline; }
+        /* Container */
+        .container { padding: 20px; max-width: 1200px; margin: 0 auto; }
+        .hidden { display: none !important; }
+
+        /* Home Screen */
+        .home-grid { display: flex; gap: 20px; justify-content: center; margin-top: 50px; flex-wrap: wrap; }
+        .card { background: white; padding: 40px; border-radius: 15px; box-shadow: 0 10px 20px rgba(0,0,0,0.1); text-align: center; cursor: pointer; transition: transform 0.3s, box-shadow 0.3s; width: 300px; }
+        .card:hover { transform: translateY(-10px); box-shadow: 0 15px 25px rgba(0,0,0,0.2); border-bottom: 4px solid #3498DB; }
+        .card-icon { font-size: 60px; margin-bottom: 20px; }
+        .card-title { font-size: 24px; font-weight: bold; color: #2C3E50; }
+
+        /* General Panel Styles */
+        .panel { background: #fff; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); min-height: 80vh; }
+        
+        /* Buttons & Inputs */
+        button { padding: 10px 20px; cursor: pointer; background: #3498DB; color: #fff; border: none; border-radius: 5px; font-weight: bold; margin: 5px; transition: 0.2s; }
+        button:hover { background: #2980B9; }
+        button.success { background: #27AE60; } button.success:hover { background: #2ecc71; }
+        button.danger { background: #E74C3C; } button.danger:hover { background: #c0392b; }
+        input[type="number"], input[type="file"] { padding: 10px; border: 1px solid #ccc; border-radius: 5px; }
+
+        /* Capture Screen */
+        .controls { text-align: center; margin-bottom: 20px; padding-bottom: 20px; border-bottom: 1px solid #eee; }
+        #imageGallery { display: flex; flex-direction: column; align-items: center; gap: 15px; }
+        #imageGallery img { max-width: 100%; border-radius: 8px; border: 3px solid #34495E; box-shadow: 0 5px 15px rgba(0,0,0,0.2); }
+
+        /* File Manager */
+        .fm-toolbar { display: flex; justify-content: space-between; align-items: center; background: #F8F9FA; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #E9ECEF; flex-wrap: wrap; gap: 10px; }
+        .fm-path { font-family: monospace; font-size: 16px; font-weight: bold; color: #2C3E50; background: #eef2f5; padding: 8px 15px; border-radius: 5px; border: 1px solid #ddd; flex-grow: 1; word-break: break-all; }
+        table { width: 100%; border-collapse: collapse; text-align: left; background: white; }
+        th, td { padding: 15px; border-bottom: 1px solid #eee; }
+        th { background: #F8F9FA; color: #2C3E50; font-weight: bold; }
+        tr:hover { background: #F1F5F8; }
+        .icon { font-size: 22px; margin-right: 15px; vertical-align: middle; }
+        .file-name { cursor: pointer; user-select: none; font-size: 16px; color: #34495E; font-weight: 500; }
+        .file-name:hover { color: #3498DB; }
+        input[type="checkbox"] { transform: scale(1.3); cursor: pointer; }
     </style>
 </head>
 <body>
 
-    <div class="panel">
-        <h3>Screen Monitor</h3>
-        <div class="control-group">
-            <button onclick="socket.emit('request_single_shot')">Capture Now</button>
-            <button class="danger" onclick="document.getElementById('imageGallery').innerHTML=''">Clear</button>
-        </div>
-        <div class="control-group">
-            <input type="number" id="timerMins" value="1" min="1" style="width: 60px;"> Mins
-            <button class="success" onclick="startStream()">Start Stream</button>
-        </div>
-        <div id="imageGallery"></div>
+    <div class="navbar">
+        <button id="backBtn" class="back-btn hidden" onclick="showHome()">🔙 Back to Home</button>
+        <span id="navTitle">Remote Dashboard</span>
     </div>
 
-    <div class="panel">
-        <h3>File Manager</h3>
+    <div class="container">
         
-        <div class="fm-header">
-            <div class="fm-path" id="currentPathDisplay">/storage/emulated/0</div>
-            <div>
-                <button class="success" onclick="downloadSelected()">⬇ Download Selected</button>
+        <div id="homeScreen" class="home-grid">
+            <div class="card" onclick="showFileManager()">
+                <div class="card-icon">📁</div>
+                <div class="card-title">File Manager</div>
+                <p style="color: #7f8c8d; margin-top: 10px;">Browse, Download & Upload files to the device.</p>
+            </div>
+            <div class="card" onclick="showCapture()">
+                <div class="card-icon">📷</div>
+                <div class="card-title">Live Capture</div>
+                <p style="color: #7f8c8d; margin-top: 10px;">Monitor the device screen in real-time.</p>
             </div>
         </div>
 
-        <div class="fm-header" style="background: #e9ecef;">
-            <input type="file" id="fileUploadInput">
-            <button onclick="uploadFile()">⬆ Upload Here</button>
-            <button onclick="loadDirectory(currentPath)">↻ Refresh</button>
+        <div id="captureScreen" class="panel hidden">
+            <div class="controls">
+                <button onclick="socket.emit('request_single_shot')">📷 Get Single Capture</button>
+                <button class="danger" onclick="document.getElementById('imageGallery').innerHTML=''">🗑️ Clear Screen</button>
+                <br><br>
+                <input type="number" id="timerMins" value="1" min="1" style="width: 80px;"> Minutes
+                <button class="success" onclick="startStream()">▶️ Start Timer Stream</button>
+            </div>
+            <div id="imageGallery"></div>
         </div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th style="width: 40px;"><input type="checkbox" id="selectAll" onclick="toggleAll()"></th>
-                    <th>Name</th>
-                    <th>Size</th>
-                </tr>
-            </thead>
-            <tbody id="fileTableBody">
-                </tbody>
-        </table>
+        <div id="fileManagerScreen" class="panel hidden">
+            
+            <div class="fm-toolbar">
+                <div class="fm-path" id="currentPathDisplay">/storage/emulated/0</div>
+                <div>
+                    <button class="success" onclick="downloadSelected()">⬇️ Download Selected</button>
+                    <button onclick="loadDirectory(currentPath)">🔄 Refresh</button>
+                </div>
+            </div>
+
+            <div class="fm-toolbar" style="background: white; border-color: #ddd;">
+                <div>
+                    <span style="font-weight: bold; margin-right: 10px;">Upload File Here:</span>
+                    <input type="file" id="fileUploadInput">
+                    <button class="success" onclick="uploadFile()">⬆️ Upload</button>
+                </div>
+            </div>
+
+            <table>
+                <thead>
+                    <tr>
+                        <th style="width: 40px;"><input type="checkbox" id="selectAll" onclick="toggleAll()"></th>
+                        <th>Name</th>
+                        <th style="width: 150px;">Size</th>
+                    </tr>
+                </thead>
+                <tbody id="fileTableBody">
+                    </tbody>
+            </table>
+        </div>
+
     </div>
 
     <script>
         const socket = io();
         let currentPath = "/storage/emulated/0";
 
-        // --- Screen Capture Logic ---
+        // --- NAVIGATION LOGIC ---
+        function showHome() {
+            document.getElementById('homeScreen').classList.remove('hidden');
+            document.getElementById('captureScreen').classList.add('hidden');
+            document.getElementById('fileManagerScreen').classList.add('hidden');
+            document.getElementById('backBtn').classList.add('hidden');
+            document.getElementById('navTitle').innerText = "Remote Dashboard";
+        }
+
+        function showCapture() {
+            document.getElementById('homeScreen').classList.add('hidden');
+            document.getElementById('captureScreen').classList.remove('hidden');
+            document.getElementById('fileManagerScreen').classList.add('hidden');
+            document.getElementById('backBtn').classList.remove('hidden');
+            document.getElementById('navTitle').innerText = "Live Screen Capture";
+        }
+
+        function showFileManager() {
+            document.getElementById('homeScreen').classList.add('hidden');
+            document.getElementById('captureScreen').classList.add('hidden');
+            document.getElementById('fileManagerScreen').classList.remove('hidden');
+            document.getElementById('backBtn').classList.remove('hidden');
+            document.getElementById('navTitle').innerText = "File Manager";
+            loadDirectory(currentPath); // Load root folder automatically
+        }
+
+
+        // --- SCREEN CAPTURE LOGIC ---
         function startStream() {
             const mins = document.getElementById('timerMins').value;
             socket.emit('request_timer_stream', { durationMinutes: parseInt(mins) });
         }
+        
         socket.on('receive_screenshot', (data) => {
             if(data && data.image) {
                 const img = document.createElement('img');
                 img.src = data.image;
                 const gallery = document.getElementById('imageGallery');
                 gallery.prepend(img);
-                if(gallery.children.length > 5) gallery.lastChild.remove();
+                if(gallery.children.length > 5) gallery.lastChild.remove(); // Keep max 5 images
             }
         });
 
-        // --- File Manager Logic ---
-        
-        // Initial load
-        window.onload = () => loadDirectory(currentPath);
 
+        // --- FILE MANAGER LOGIC ---
         function loadDirectory(path) {
             currentPath = path;
             document.getElementById('currentPathDisplay').innerText = currentPath;
-            document.getElementById('fileTableBody').innerHTML = '<tr><td colspan="3">Loading...</td></tr>';
+            document.getElementById('fileTableBody').innerHTML = '<tr><td colspan="3" style="text-align: center; padding: 30px;">Loading files... ⏳</td></tr>';
             socket.emit('request_directory', currentPath);
         }
 
@@ -110,32 +178,41 @@
             const tbody = document.getElementById('fileTableBody');
             tbody.innerHTML = '';
             
-            // Add "Go Back" row if not in root
+            // "Go Up" button logic
             if (currentPath !== "/storage/emulated/0" && currentPath.length > 1) {
                 const parentPath = currentPath.substring(0, currentPath.lastIndexOf('/'));
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
                     <td></td>
                     <td colspan="2" class="file-name" onclick="loadDirectory('${parentPath || '/'}')">
-                        <span class="icon">🔙</span> .. (Go Up)
+                        <span class="icon">🔙</span> <strong style="color: #3498DB;">.. (Go Up)</strong>
                     </td>
                 `;
                 tbody.appendChild(tr);
             }
 
             if (data.error) {
-                tbody.innerHTML = `<tr><td colspan="3" style="color:red;">Error: ${data.error}</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="3" style="color:red; text-align:center;">Error: ${data.error}</td></tr>`;
+                return;
+            }
+
+            if (data.files.length === 0) {
+                tbody.innerHTML = `<tr><td colspan="3" style="text-align:center; color:#7f8c8d;">Folder is empty.</td></tr>`;
                 return;
             }
 
             data.files.forEach(file => {
                 const tr = document.createElement('tr');
+                
+                // Icon selection based on file type
                 let icon = '📄';
                 if (file.isDirectory) icon = '📁';
                 else if (file.name.match(/\.(jpg|jpeg|png|gif)$/i)) icon = '🖼️';
                 else if (file.name.match(/\.(mp4|mkv|avi)$/i)) icon = '🎥';
                 else if (file.name.match(/\.(mp3|wav|m4a)$/i)) icon = '🎵';
                 else if (file.name.match(/\.(apk)$/i)) icon = '📦';
+                else if (file.name.match(/\.(pdf|doc|txt)$/i)) icon = '📝';
+                else if (file.name.match(/\.(zip|rar)$/i)) icon = '🗜️';
 
                 const sizeText = file.isDirectory ? '--' : (file.size / 1024 / 1024).toFixed(2) + ' MB';
                 
@@ -144,10 +221,12 @@
                     <td class="file-name" onclick="${file.isDirectory ? `loadDirectory('${file.path.replace(/\\/g, '\\\\')}')` : ''}">
                         <span class="icon">${icon}</span> ${file.name}
                     </td>
-                    <td>${sizeText}</td>
+                    <td style="color: #7f8c8d;">${sizeText}</td>
                 `;
                 tbody.appendChild(tr);
             });
+            // Reset select all checkbox
+            document.getElementById('selectAll').checked = false;
         });
 
         function toggleAll() {
@@ -155,33 +234,31 @@
             document.querySelectorAll('.file-checkbox').forEach(cb => cb.checked = isChecked);
         }
 
-        // --- File Download Logic ---
+        // --- DOWNLOAD LOGIC ---
         function downloadSelected() {
             const checkboxes = document.querySelectorAll('.file-checkbox:checked');
-            if (checkboxes.length === 0) { alert('Select at least one file to download.'); return; }
+            if (checkboxes.length === 0) { alert('Please select at least one file to download.'); return; }
             
             checkboxes.forEach(cb => {
                 const filePath = cb.value;
                 socket.emit('request_download_file', filePath);
             });
+            
             document.getElementById('selectAll').checked = false;
             toggleAll();
         }
 
-        // Handle incoming downloaded file
         socket.on('receive_file_data', (data) => {
             if(data.error) { alert('Download failed: ' + data.error); return; }
-            
-            // Create a temporary link to download the base64 data
             const a = document.createElement("a");
-            a.href = data.fileData; // base64 string
+            a.href = data.fileData; // base64 payload
             a.download = data.fileName;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
         });
 
-        // --- File Upload Logic ---
+        // --- UPLOAD LOGIC ---
         function uploadFile() {
             const fileInput = document.getElementById('fileUploadInput');
             const file = fileInput.files[0];
@@ -195,12 +272,11 @@
                     fileName: file.name,
                     fileData: base64Data
                 });
-                alert('Uploading ' + file.name + '...');
+                alert('Uploading: ' + file.name + '\nPlease wait for the folder to refresh.');
                 fileInput.value = ''; 
             };
             reader.readAsDataURL(file);
         }
-
     </script>
 </body>
 </html>
