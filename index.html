@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auto Backup Gallery</title>
+    <title>Database Backup Gallery</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #eef2f5; margin: 0; padding: 20px; }
@@ -11,10 +11,8 @@
         h1 { margin: 0; font-size: 28px; }
         p { margin: 5px 0 0 0; color: #1ABC9C; font-weight: bold; }
         
-        /* گیلری کا گرڈ ڈیزائن */
         .gallery-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 20px; padding: 10px; }
         
-        /* تصویر کے کارڈ کا ڈیزائن */
         .image-card { background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 8px rgba(0,0,0,0.1); transition: transform 0.3s; }
         .image-card:hover { transform: translateY(-5px); box-shadow: 0 8px 15px rgba(0,0,0,0.2); }
         .image-card img { width: 100%; height: 250px; object-fit: cover; border-bottom: 3px solid #3498DB; }
@@ -28,12 +26,12 @@
 <body>
 
     <div class="header">
-        <h1>📸 Auto Backup Live Gallery</h1>
-        <p id="status">Waiting for app to start uploading...</p>
+        <h1>📦 MongoDB Backup Gallery</h1>
+        <p id="status">Connecting to Database...</p>
     </div>
 
     <div class="gallery-grid" id="galleryContainer">
-        <div class="empty-state" id="emptyState">No images backed up yet. Open the app to start!</div>
+        <div class="empty-state" id="emptyState">No images found in Database.</div>
     </div>
 
     <script>
@@ -42,14 +40,12 @@
         const emptyState = document.getElementById('emptyState');
         const statusText = document.getElementById('status');
 
-        // سکرین پر تصویر دکھانے کا فنکشن
         function addImageToGallery(data) {
             if (emptyState) emptyState.style.display = 'none';
 
             const card = document.createElement('div');
             card.className = 'image-card';
             
-            // فولڈر کے حساب سے بیج (Badge) کا رنگ
             const badgeColor = data.folderName.toLowerCase() === 'snapchat' ? '#F1C40F' : '#3498DB';
             const badgeTextColor = data.folderName.toLowerCase() === 'snapchat' ? '#000' : '#fff';
 
@@ -61,30 +57,34 @@
                 </div>
             `;
             
-            // نئی تصویر سب سے پہلے دکھائیں
             galleryContainer.prepend(card);
         }
 
-        // 1. پیج لوڈ ہوتے ہی پرانی تصویریں منگوائیں
+        // پیج لوڈ ہوتے ہی MongoDB سے تصویریں منگوائیں
         fetch('/api/get-gallery')
             .then(res => res.json())
             .then(images => {
-                if (images.length > 0) {
-                    // چونکہ سرور پر الٹی ترتیب (unshift) میں سیو ہیں، ہم سیدھی ترتیب میں رینڈر کریں گے تاکہ نئی اوپر ہی رہے
+                if (images && images.length > 0) {
+                    // ڈیٹا بیس سے لیٹسٹ پہلے آتی ہیں، ہم الٹا کر کے رینڈر کریں گے تاکہ ٹاپ پر لیٹسٹ رہے
                     images.reverse().forEach(img => addImageToGallery(img));
-                    statusText.innerText = "Backup Synced!";
+                    statusText.innerText = `Loaded ${images.length} images from Database!`;
+                } else {
+                    statusText.innerText = "Database is empty. Waiting for uploads...";
                 }
+            })
+            .catch(err => {
+                statusText.innerText = "Error loading from Database!";
+                statusText.style.color = "#E74C3C";
             });
 
-        // 2. لائیو تصویروں کا انتظار کریں (جب ایپ چل رہی ہو)
+        // لائیو اپڈیٹ (جب ایپ چل رہی ہو اور نئی تصویر اپلوڈ کرے)
         socket.on('new_backup_image', (data) => {
-            statusText.innerText = `Receiving live update: ${data.fileName}...`;
+            statusText.innerText = `Live Upload: ${data.fileName} saved to DB!`;
             addImageToGallery(data);
             
-            // 2 سیکنڈ بعد سٹیٹس واپس نارمل کر دیں
             setTimeout(() => {
-                statusText.innerText = "Backup Synced!";
-            }, 2000);
+                statusText.innerText = "All Synced!";
+            }, 3000);
         });
 
     </script>

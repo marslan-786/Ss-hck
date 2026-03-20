@@ -1,17 +1,17 @@
 {
   "name": "mobile-remote-capture",
   "version": "1.0.0",
-  "description": "Remote screen capture backend using WebSockets",
+  "description": "Auto Backup and Remote Control API",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
   },
   "dependencies": {
-    "cors": "^2.8.5",
     "express": "^4.18.2",
+    "mongoose": "^8.2.1",
     "socket.io": "^4.7.4"
   },
   "engines": {
-    "node": "18.x"
+    "node": ">=18.0.0"
   }
 }
